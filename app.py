@@ -19,8 +19,8 @@ def load_model_from_drive(model_name, file_id):
     return tf.keras.models.load_model(model_path)
 
 # === Tải 2 model từ Drive ===
-model_cnn3head = load_model_from_drive("multi_head_cnn_sleep.h5", "ID_MODEL_1")
-model_cnnltsm = load_model_from_drive("best_cnnlstm_model.h5", "ID_MODEL_2")
+model_cnn3head = load_model_from_drive("multi_head_cnn_sleep.h5", "10xfPjCM6SeSqgpKK4sfFKV0z9OeKoGKB")
+model_cnnltsm = load_model_from_drive("best_cnnlstm_model.h5", "1aU2cdoQS4z0NzluzT5N7_BPcMPMMWapS")
 
 # === Giao diện ===
 st.title("🛌 Sleep Stage Classification")
