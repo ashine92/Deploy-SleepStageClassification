@@ -1,30 +1,31 @@
 import streamlit as st
 import numpy as np
-import tensorflow as tf
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
-import pandas as pd
+import tensorflow as tf
+import os
+import gdown
 
-tf.compat.v1.reset_default_graph()
-
-# Load mô hình
+# === Hàm tải model từ Google Drive ===
 @st.cache_resource
-def load_model_1():
-    return tf.keras.models.load_model("models/multi_head_cnn_sleep.h5")
+def load_model_from_drive(model_name, file_id):
+    model_path = f"models/{model_name}"
+    if not os.path.exists(model_path):
+        os.makedirs("models", exist_ok=True)
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, model_path, quiet=False)
+    return tf.keras.models.load_model(model_path)
 
-@st.cache_resource
-def load_model_2():
-    return tf.keras.models.load_model("D:/Study/DH/MangCamBien/final-sleep-stage-classification/models/best_cnnlstm_model.h5")
+# === Tải 2 model từ Drive ===
+model_cnn3head = load_model_from_drive("multi_head_cnn_sleep.h5", "ID_MODEL_1")
+model_cnnltsm = load_model_from_drive("best_cnnlstm_model.h5", "ID_MODEL_2")
 
-model_cnn3head = load_model_1()
-model_cnnltsm = load_model_2()
-
-# Giao diện chính
+# === Giao diện ===
 st.title("🛌 Sleep Stage Classification")
 st.markdown("Tải dữ liệu tín hiệu EEG (.npz) để dự đoán giai đoạn giấc ngủ với 2 mô hình và so sánh kết quả.")
 
-# Upload file
 uploaded_file = st.file_uploader("📂 Tải lên file dữ liệu (.npz)", type=["npz"])
 
 if uploaded_file is not None:
@@ -41,85 +42,53 @@ if uploaded_file is not None:
             else:
                 labels = ['Wake', 'N1', 'N2', 'N3', 'REM']
 
-                # 1️⃣ Mô hình CNN 3 Head
+                # === Mô hình 1: CNN 3 Head ===
                 st.subheader("🔹 Mô hình 1: CNN 3 Head")
                 x3 = [x, x, x]
-                pred_1 = model_cnn3head.predict(x3)
-                y_pred1 = np.argmax(pred_1, axis=1)
+                y_pred1 = np.argmax(model_cnn3head.predict(x3), axis=1)
                 acc1 = np.mean(y_pred1 == y_true)
                 st.success(f"🎯 Accuracy (CNN 3 Head): {acc1 * 100:.2f}%")
+                st.bar_chart(pd.DataFrame(np.bincount(y_pred1, minlength=5), index=labels, columns=["Số lượng"]))
 
-                # Bar chart với st.bar_chart
-                counts1 = np.bincount(y_pred1, minlength=5)
-                df_counts1 = pd.DataFrame(counts1, index=labels, columns=["Số lượng"])
-                st.bar_chart(df_counts1)
-
-                # 2️⃣ Mô hình CNN-LSTM
+                # === Mô hình 2: CNN-LSTM ===
                 st.subheader("🔹 Mô hình 2: CNN-LSTM")
                 try:
-                    model_cnnltsm.summary()
-                    pred_2 = model_cnnltsm.predict([x,x,x])
-                    y_pred2 = np.argmax(pred_2, axis=1)
+                    y_pred2 = np.argmax(model_cnnltsm.predict([x,x,x]), axis=1)
                     acc2 = np.mean(y_pred2 == y_true)
                     st.success(f"🎯 Accuracy (CNN-LSTM): {acc2 * 100:.2f}%")
+                    st.bar_chart(pd.DataFrame(np.bincount(y_pred2, minlength=5), index=labels, columns=["Số lượng"]))
 
-                    counts2 = np.bincount(y_pred2, minlength=5)
-                    df_counts2 = pd.DataFrame(counts2, index=labels, columns=["Số lượng"])
-                    st.bar_chart(df_counts2)
-
-                    # 🔄 So sánh phân bố
+                    # So sánh
                     st.subheader("📊 So sánh phân bố giữa 2 mô hình")
                     df_compare = pd.DataFrame({
-                        'CNN 3 Head': counts1,
-                        'CNN-LSTM': counts2
+                        'CNN 3 Head': np.bincount(y_pred1, minlength=5),
+                        'CNN-LSTM': np.bincount(y_pred2, minlength=5)
                     }, index=labels)
                     st.bar_chart(df_compare)
 
-                except Exception as e2:
-                    st.error(f"❌ Lỗi khi chạy mô hình CNN-LSTM: {e2}")
-                    st.write("Chi tiết lỗi:", str(e2))
-
-                if 'y_pred2' in locals():
-                    # Confusion matrix
+                    # Confusion Matrix
                     st.subheader("🧮 Confusion Matrix")
+                    for name, y_pred, cm_color in [("CNN 3 Head", y_pred1, 'Blues'), ("CNN-LSTM", y_pred2, 'OrRd')]:
+                        fig, ax = plt.subplots()
+                        cm = confusion_matrix(y_true, y_pred, labels=[0,1,2,3,4])
+                        sns.heatmap(cm, annot=True, fmt='d', cmap=cm_color, xticklabels=labels, yticklabels=labels, ax=ax)
+                        ax.set_title(f"{name} - Confusion Matrix")
+                        st.pyplot(fig)
 
-                    fig_cm1, ax_cm1 = plt.subplots()
-                    cm1 = confusion_matrix(y_true, y_pred1, labels=[0,1,2,3,4])
-                    sns.heatmap(cm1, annot=True, fmt='d', cmap='Blues',
-                                xticklabels=labels, yticklabels=labels, ax=ax_cm1)
-                    ax_cm1.set_title("CNN 3 Head - Confusion Matrix")
-                    ax_cm1.set_xlabel("Predicted")
-                    ax_cm1.set_ylabel("True")
-                    st.pyplot(fig_cm1)
-
-                    fig_cm2, ax_cm2 = plt.subplots()
-                    cm2 = confusion_matrix(y_true, y_pred2, labels=[0,1,2,3,4])
-                    sns.heatmap(cm2, annot=True, fmt='d', cmap='OrRd',
-                                xticklabels=labels, yticklabels=labels, ax=ax_cm2)
-                    ax_cm2.set_title("CNN-LSTM - Confusion Matrix")
-                    ax_cm2.set_xlabel("Predicted")
-                    ax_cm2.set_ylabel("True")
-                    st.pyplot(fig_cm2)
-
-                    # So sánh dự đoán
-                    st.subheader("🔍 Mức độ giống nhau giữa 2 mô hình")
+                    # Mức độ giống nhau
                     match_rate = np.mean(y_pred1 == y_pred2)
-                    st.info(f"🧩 Hai mô hình dự đoán giống nhau ở {match_rate*100:.2f}% số epoch.")
+                    st.info(f"🧩 Hai mô hình giống nhau ở {match_rate*100:.2f}% số epoch.")
 
                     # Báo cáo phân loại
                     st.subheader("📑 Báo cáo phân loại")
-
-                    report1 = classification_report(y_true, y_pred1, target_names=labels, output_dict=True, zero_division=0)
-                    report2 = classification_report(y_true, y_pred2, target_names=labels, output_dict=True, zero_division=0)
-
                     st.markdown("**CNN 3 Head**")
-                    st.dataframe(pd.DataFrame(report1).transpose())
-
+                    st.dataframe(pd.DataFrame(classification_report(y_true, y_pred1, target_names=labels, output_dict=True)).transpose())
                     st.markdown("**CNN-LSTM**")
-                    st.dataframe(pd.DataFrame(report2).transpose())
+                    st.dataframe(pd.DataFrame(classification_report(y_true, y_pred2, target_names=labels, output_dict=True)).transpose())
+
+                except Exception as e2:
+                    st.error(f"❌ Lỗi khi chạy CNN-LSTM: {e2}")
         else:
             st.error("❌ File không chứa 'x' và 'y'.")
-
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý file: {e}")
-        st.write("Chi tiết lỗi:", str(e))
