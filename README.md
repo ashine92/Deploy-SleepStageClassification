@@ -39,9 +39,11 @@ pip install -r requirements.txt
 ## Results
 ### Classification Report
 ![image](https://github.com/user-attachments/assets/0d303ec8-3592-4bc4-8b4d-886c945ca6be)
+
 Figure 1. Classification Report (CNN 3 Head)
 
 ![image](https://github.com/user-attachments/assets/e6adb784-1f92-4ad3-add9-291feb080619)
+
 Figure 2. Classification Report (CNN-LSTM)
 
 ### Confusion Matrix
